@@ -13,4 +13,4 @@ rosbag play --clock <ROSBAG PATH>
 ```
 
 ## Required packages
-- [fast_gicp](https://github.com/koide3/fast_gicp)
+- [fast_gicp](https://github.com/SMRT-AIST/fast_gicp)
