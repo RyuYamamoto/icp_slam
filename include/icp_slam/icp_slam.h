@@ -42,13 +42,12 @@ private:
 
   Pose getCurrentPose();
 
-  void imuCorrect(const ros::Time current_scan_time);
 
   void pointsCallback(const sensor_msgs::PointCloud2::ConstPtr& input_points_ptr_msg);
-  void odomCallback(const nav_msgs::Odometry::ConstPtr& msg);
   void imuCallback(const sensor_msgs::Imu::ConstPtr& msg);
 
   void imuCorrect(Eigen::Matrix4f &pose, const ros::Time stamp);
+  void publishOdometry(const Pose pose, const ros::Time stamp);
 
   geometry_msgs::TransformStamped getTransform(const std::string target_frame, const std::string source_frame);
   void transformPointCloud(
@@ -62,8 +61,8 @@ private:
   ros::NodeHandle pnh_{ "~" };
 
   ros::Subscriber points_subscriber_;
-  ros::Subscriber odom_subscriber_;
   ros::Subscriber imu_subscriber_;
+  ros::Publisher scan_matcher_odometry_publisher_;
   ros::Publisher icp_aligned_cloud_publisher_;
   ros::Publisher icp_map_publisher_;
   ros::Publisher icp_pose_publisher_;
@@ -107,7 +106,6 @@ private:
   double transformation_epsilon_;
 
   sensor_msgs::Imu imu_;
-  nav_msgs::Odometry odom_;
 };
 
 #endif

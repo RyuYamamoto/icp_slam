@@ -34,15 +34,13 @@ ICPSlam::ICPSlam() : tf_listener_(tf_buffer_)
   registration_->setMaximumIterations(max_iteration_);
   registration_->setTransformationEpsilon(transformation_epsilon_);
   registration_->setMaxCorrespondenceDistance(max_correspondence_distance_);
-  //registration_->setEuclideanFitnessEpsilon(euclidean_fitness_epsilon_);
-  //registration_->setRANSACOutlierRejectionThreshold(ransac_outlier_rejection_threshold_);
 
   // create subscriber
   points_subscriber_ = nh_.subscribe("points_raw", 1000, &ICPSlam::pointsCallback, this);
-  odom_subscriber_ = nh_.subscribe("odom", 10, &ICPSlam::odomCallback, this);
   imu_subscriber_ = nh_.subscribe("imu", 10, &ICPSlam::imuCallback, this);
 
   // create publisher
+  scan_matcher_odometry_publisher_ = nh_.advertise<nav_msgs::Odometry>("scan_matcher_odometry", 1);
   icp_aligned_cloud_publisher_ = nh_.advertise<sensor_msgs::PointCloud2>("alinged_cloud", 1000);
   icp_map_publisher_ = nh_.advertise<sensor_msgs::PointCloud2>("icp_map", 1000);
   icp_pose_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("icp_pose", 1000);
@@ -145,7 +143,7 @@ void ICPSlam::pointsCallback(const sensor_msgs::PointCloud2::ConstPtr& input_poi
 
   // publish tf
   icp_pose_ = getCurrentPose();  // convert matrix to vec
-  icp_slam_utils::publishTF(broadcaster_, icp_pose_, current_scan_time, "map", base_frame_id_);
+  //icp_slam_utils::publishTF(broadcaster_, icp_pose_, current_scan_time, "map", base_frame_id_);
 
   pcl::PointCloud<PointType>::Ptr transform_cloud_ptr(new pcl::PointCloud<PointType>);
   pcl::transformPointCloud(
@@ -178,11 +176,28 @@ void ICPSlam::pointsCallback(const sensor_msgs::PointCloud2::ConstPtr& input_poi
   icp_pose_msg.pose = icp_slam_utils::convertToGeometryPose(icp_pose_);
   icp_pose_publisher_.publish(icp_pose_msg);
 
+  publishOdometry(icp_pose_, current_scan_time);
+
   std::cout << "-----------------------------------------------------------------" << std::endl;
   std::cout << "ICP has converged: " << convergenced << std::endl;
   std::cout << "Fitness score: " << fitness_score << std::endl;
   std::cout << "delta: " << delta << std::endl;
   std::cout << "-----------------------------------------------------------------" << std::endl;
+}
+
+void ICPSlam::publishOdometry(const Pose pose, const ros::Time stamp)
+{
+  icp_slam_utils::publishTF(broadcaster_, pose, stamp, "odom", base_frame_id_);
+
+  nav_msgs::Odometry odometry;
+  geometry_msgs::Pose pose_msg = icp_slam_utils::convertToGeometryPose(pose);
+
+  odometry.header.frame_id = "odom";
+  odometry.child_frame_id = base_frame_id_;
+  odometry.header.stamp = stamp;
+  odometry.pose.pose = pose_msg;
+
+  scan_matcher_odometry_publisher_.publish(odometry);
 }
 
 void ICPSlam::transformPointCloud(
@@ -234,11 +249,6 @@ bool ICPSlam::saveMapService(icp_slam::SaveMapRequest& req, icp_slam::SaveMapRes
   res.ret = (ret == 0);
 
   return true;
-}
-
-void ICPSlam::odomCallback(const nav_msgs::Odometry::ConstPtr& msg)
-{
-  odom_ = *msg;
 }
 
 void ICPSlam::imuCallback(const sensor_msgs::Imu::ConstPtr& msg)
